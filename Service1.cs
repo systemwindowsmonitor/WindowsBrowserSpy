@@ -14,43 +14,57 @@ using WindowsMonitorService;
 using System.Collections.ObjectModel;
 using System.Collections;
 using System.Management;
+using Microsoft.Win32;
 
 namespace FileWatcherService
 {
     public partial class Service1 : ServiceBase
     {
         Logger logger;
-        string UserName;
         public Service1()
         {
             InitializeComponent();
-
-
-            UserName = GetUserName();
+            //события службы
             this.CanStop = true;
             this.CanPauseAndContinue = true;
             this.AutoLog = true;
 
             this.CanHandleSessionChangeEvent = true;
+
+            //системные события
+            SystemEvents.SessionEnded += OnSessionEnded;
+        }
+
+        /// <summary>
+        /// Отслеживание выключения компа
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void OnSessionEnded(object sender, SessionEndedEventArgs e)
+        {
+            if (e.Reason == SessionEndReasons.SystemShutdown)
+            {
+                //будем отправлять на сервер что комп отключили
+            }
         }
 
         protected override void OnSessionChange(SessionChangeDescription obj)
         {
-           
-               logger.UserName = GetUserName();
-            
+
+            logger.UserName = GetUserName();
+
         }
 
+        /// <summary>
+        /// Получение имени учетной записи пользователя 
+        /// </summary>
+        /// <returns>Имя учетки в ОС</returns>
         private string GetUserName()
         {
             ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT UserName FROM Win32_ComputerSystem");
             ManagementObjectCollection collection = searcher.Get();
-            string s = collection.Cast<ManagementBaseObject>().First()["UserName"].ToString().Split('\\')[1].Split('-')[0];
-
-            return s ;
+            return collection.Cast<ManagementBaseObject>().First()["UserName"].ToString().Split('\\')[1].Split('-')[0]; ;
         }
-
-
 
         protected override void OnStart(string[] args)
         {
@@ -58,8 +72,6 @@ namespace FileWatcherService
             Thread loggerThread = new Thread(new ThreadStart(logger.Start));
             loggerThread.Start();
         }
-
-
 
         protected override void OnStop()
         {
@@ -74,7 +86,7 @@ namespace FileWatcherService
         public string UserName { get; set; }
         object obj = new object();
         bool enabled = true;
-  
+
         public Logger(string name)
         {
             UserName = name;
@@ -116,7 +128,7 @@ namespace FileWatcherService
             }
             catch (Exception ex)
             {
-                RecordEntry(ex.Message, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\t" );
+                RecordEntry(ex.Message, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\t");
             }
         }
 
@@ -200,11 +212,11 @@ namespace FileWatcherService
                     //readHistory();
                 }
                 yandex = $@"C:\Users\{UserName}\AppData\Local\Yandex\YandexBrowser\User Data\Default\";
-                
+
             }
             catch (Exception ex)
             {
-                RecordEntry(ex.Message, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\t" );
+                RecordEntry(ex.Message, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\t");
             }
         }
 
@@ -254,7 +266,7 @@ namespace FileWatcherService
 
         public void Start()
         {
-        
+
             while (enabled)
             {
                 Thread.Sleep(60000);
@@ -300,7 +312,7 @@ namespace FileWatcherService
 
         public void Stop()
         {
-       
+
             enabled = false;
         }
 

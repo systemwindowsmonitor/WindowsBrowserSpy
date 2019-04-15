@@ -1,0 +1,40 @@
+﻿using FileWatcherService;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Management;
+using System.Runtime.InteropServices;
+using System.ServiceProcess;
+using System.Text;
+using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Security.Principal;
+
+namespace WindowsMonitorService
+{
+    static class Program
+    {
+        
+        /// <summary>
+        /// Главная точка входа для приложения.
+        /// </summary>
+        static void Main()
+        {
+            ServiceBase[] ServicesToRun;
+            ServicesToRun = new ServiceBase[]
+            {
+                    new Service1()
+            };
+            ServiceBase.Run(ServicesToRun);
+
+        }
+
+
+
+
+
+
+    }
+    
+}

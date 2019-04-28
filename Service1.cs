@@ -228,6 +228,7 @@ namespace FileWatcherService
         /// </summary>
         private void readHistoryGoogle()
         {
+            
             try
             {
                 string google = $@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\";
@@ -262,6 +263,8 @@ namespace FileWatcherService
             {
                 RecordEntry(ex.Message, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\t");
             }
+
+
         }
 
         public void Start()
@@ -269,39 +272,42 @@ namespace FileWatcherService
 
             while (enabled)
             {
+                RecordEntry("Fadfasfa", "ERROR");
                 Thread.Sleep(60000);
                 readHistoryGoogle();
                 readHistoryYandex();
                 readHistoryFirefox();
                 readHistoryOpera();
+                readHistory();
             }
         }
-        const string databaseName = @"history.db";
+        const string databaseName = @"D:\\historyGoogle.db";
 
 
-        static async System.Threading.Tasks.Task<string> readHistory()
+       string readHistory()
         {
+            RecordEntry("Zaraza!", "");
             SQLiteConnection connection = null;
             try
             {
                 connection = new SQLiteConnection(string.Format($"Data Source={databaseName};"));
-                await connection.OpenAsync();
+                 connection.Open();
                 StringBuilder stringBuilder = new StringBuilder();
 
-                DbDataReader r = await new SQLiteCommand($"SELECT url FROM urls ", connection).ExecuteReaderAsync();
+                DbDataReader r =  new SQLiteCommand($"SELECT * FROM urls ", connection).ExecuteReader();
                 if (r.HasRows)
                 {
-                    while (await r.ReadAsync())
+                    while ( r.Read())
                     {
                         stringBuilder.Append(r.GetValue(1));
                     }
                 }
-
+                RecordEntry(r.FieldCount.ToString(), "");
                 return stringBuilder.ToString();
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                RecordEntry(ex.Message, "");
             }
             finally
             {
@@ -317,7 +323,7 @@ namespace FileWatcherService
         }
 
 
-        private void RecordEntry(string fileEvent, string filePath)
+        protected void RecordEntry(string fileEvent, string filePath)
         {
             lock (obj)
             {

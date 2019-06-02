@@ -20,11 +20,11 @@ namespace FileWatcherService
     public partial class Service1 : ServiceBase
     {
         Logger logger;
-        string UserName;
+        string UserName = String.Empty;
         public Service1()
         {
             InitializeComponent();
-            GetUserName();
+
 
 
             this.CanStop = true;
@@ -45,28 +45,28 @@ namespace FileWatcherService
 
             ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT UserName FROM Win32_ComputerSystem");
             ManagementObjectCollection collection = searcher.Get();
-            string s = collection.Cast<ManagementBaseObject>().First()["UserName"].ToString().Split('\\')[1].Split('-')[0];
+            string s = collection.Cast<ManagementBaseObject>().First()["UserName"].ToString().Split('\\')[1].Split('-').Last();
+
 
             if (UserName != s)
             {
                 lock (obj)
                 {
+                    UserName = s;
                     using (StreamWriter writer = new StreamWriter("D:\\templog.txt", true))
                     {
-                        writer.WriteLine($"{s} вошел в систему {DateTime.Now.ToString()}");
-                        writer.Flush();
+
+                        writer.WriteLine($"{UserName} вошел в систему {DateTime.Now.ToString()}");
+
                     }
                 }
 
-                UserName = s;
             }
+
         }
-
-
-
         protected override void OnStart(string[] args)
         {
-
+            GetUserName();
             logger = new Logger(UserName);
             logger.RecordEntry("Служба запущенна!");
             Thread loggerThread = new Thread(new ThreadStart(logger.Start));
@@ -79,7 +79,6 @@ namespace FileWatcherService
         {
             logger.Stop();
             logger.RecordEntry("Служба остановлена!");
-            Thread.Sleep(4000);
         }
     }
 
@@ -265,16 +264,14 @@ namespace FileWatcherService
                     File.WriteAllBytes("D:\\historyGoogle.db", buffer);
                     ms.Close();
                     ms.Dispose();
-                    //readHistory();
                 }
                 google = $@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\";
+
             }
             catch (Exception ex)
             {
                 RecordEntry(ex.Message);
             }
-
-
         }
 
         public void Start()
@@ -284,9 +281,10 @@ namespace FileWatcherService
             {
                 try
                 {
-                    Thread.Sleep(3000);
+                    Thread.Sleep(60000);
                     copyHistoryGoogle();
-                    her();
+                    ReadGoogleDataBase();
+                    GC.Collect();
                 }
                 catch (Exception d)
                 {
@@ -302,21 +300,58 @@ namespace FileWatcherService
             }
         }
         const string databaseName = @"D:\\historyGoogle.db";
-        private void her()
+        private void ReadGoogleDataBase()
         {
             try
             {
+                
                 if (File.Exists(databaseName))
                 {
-                    RecordEntry("+");
+                    
+                    string lastTime = null;
+                    string tmpPath = "D:\\tmpGoogle.txt";
+                    if (lastTime == null)
+                        lastTime = DateTime.Now.ToString();
+                    if (File.Exists(tmpPath))
+                    {
+                        
+                        using (FileStream f = new FileStream(tmpPath, FileMode.Open))
+                        {
+                            // преобразуем строку в байты
+                            byte[] array = new byte[f.Length];
+                            // считываем данные
+                            f.Read(array, 0, array.Length);
+                            // декодируем байты в строку
+                            lastTime = Encoding.Default.GetString(array);
+
+                        }
+                    }
+                    
                     using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={databaseName};")))
                     {
+                        
                         connection.Open();
                         StringBuilder stringBuilder = new StringBuilder();
-
-                        DbDataReader r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
+                        
+                        DbDataReader r = null;
+                        
+                        if (DateTime.Parse(lastTime) < DateTime.Now)
+                        {
+                            
+                            r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
+                      
+                        }
+                        else
+                        {
+                            
+                            RecordEntry(((DateTime.Now.ToFileTime() / 10).ToString()));
+                            //r = new SQLiteCommand($"SELECT * FROM urls where last_visit_time = {(DateTime.Now.ToFileTime() / 10)}", connection).ExecuteReader();
+                            r = new SQLiteCommand("SELECT * FROM urls where last_visit_time > '213213'", connection).ExecuteReader();
+                           
+                        }
                         if (r.HasRows)
                         {
+                            
                             while (r.Read())
                             {
                                 stringBuilder.Append("title:\t");
@@ -329,73 +364,19 @@ namespace FileWatcherService
                             }
                         }
 
-                        RecordEntry(stringBuilder.ToString());
+                        //RecordEntry(stringBuilder.ToString());
+
+                        using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
+                        {
+                            f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
+                        }
                     }
-                }
-                else
-                {
-                    RecordEntry("-");
                 }
             }
             catch (Exception ex)
             {
                 RecordEntry(ex.Message);
             }
-
-
-            //RecordEntry("Test -1");
-            //try
-            //{
-            //    RecordEntry("Test -2" );
-            //   using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={databaseName};")))
-            //    { }
-            //    //{
-            //    //    RecordEntry("Test");
-            //    //}
-            //}
-            //catch (Exception ex)
-            //{
-
-            //    RecordEntry(ex.Message);
-            //}
-        }
-
-        string test()
-        {
-
-            try
-            {
-
-                using (SQLiteConnection connection = new SQLiteConnection($"Data Source={"D:\\historyGoogle.db"};"))
-                {
-                    File.AppendAllText("D:\\t.txt", "open copy");
-                    connection.Open();
-                    StringBuilder stringBuilder = new StringBuilder();
-
-                    DbDataReader r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
-                    File.AppendAllText("D:\\t.txt", "start select");
-                    if (r.HasRows)
-                    {
-                        while (r.Read())
-                        {
-                            for (int i = 0; i < r.FieldCount; i++)
-                            {
-                                stringBuilder.Append("\t" + r.GetValue(i));
-                            }
-                        }
-                    }
-                    File.AppendAllText("D:\\t.txt", "return copy");
-                    if (stringBuilder.Length > 0)
-                        return stringBuilder.ToString();
-                    return "";
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-
-            return String.Empty;
         }
 
         public void Stop()
@@ -403,9 +384,6 @@ namespace FileWatcherService
 
             enabled = false;
         }
-
-
-        //открой sqllite studio
 
 
         public void RecordEntry(string fileEvent)

